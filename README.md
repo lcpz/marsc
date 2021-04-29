@@ -1,5 +1,7 @@
 # MARSC
 
+[![DOI](https://zenodo.org/badge/362866832.svg)](https://zenodo.org/badge/latestdoi/362866832)
+
 | **Author** | **License** |
 |---|---|
 | [Luca Capezzuto](https://lcpz.gitlab.io) | [MIT](https://opensource.org/licenses/MIT) |
