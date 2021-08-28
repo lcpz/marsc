@@ -24,6 +24,8 @@ public abstract class MARSC implements Serializable {
 
 	protected Agent[] agents;
 
+	public final int maximumProblemCompletionTime;
+
 	protected String stringRepresentation;
 
 	public MARSC(Task[] tasks, Map<Task, Task> order, Agent[] agents) {
@@ -42,7 +44,7 @@ public abstract class MARSC implements Serializable {
 		// 'order' can be null or empty (implying no task ordering)
 		if (order != null && order.size() > 0) {
 			try {
-				if (order.entrySet().contains(null) || order.values().contains(null))
+				if (order.entrySet().contains(null) || order.containsValue(null))
 					throw new Exception("order map contains null keys or values");
 				if (Utils.hasCycle(order))
 					throw new Exception("order map contains cycles");
@@ -52,6 +54,12 @@ public abstract class MARSC implements Serializable {
 
 			this.order = order;
 		}
+
+		int dmax = 0;
+		for (Task v : tasks)
+			if (v.demand.timeWindow.hardLatestTime > dmax)
+				dmax = v.demand.timeWindow.hardLatestTime;
+		maximumProblemCompletionTime = dmax;
 	}
 
 	public Task[] getTasks() {

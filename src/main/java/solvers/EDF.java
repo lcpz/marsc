@@ -1,5 +1,6 @@
 package solvers;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
@@ -28,16 +29,14 @@ public class EDF extends BNT {
 	@Override
 	public void solve() {
 		taskSet = new TreeSet<>(comparator);
-
-		for (Task v : problem.getTasks())
-			taskSet.add(v);
+		Collections.addAll(taskSet, tasks);
 
 		HashSet<Task> completedTasks = new HashSet<>();
 		HashSet<CoalitionAllocation> l = new HashSet<>();
 		Solution currentSolution;
 
 		for (Task v : taskSet) {
-			currentSolution = getSingletonSolution(v);
+			currentSolution = getSingletonSolution(v, agents);
 
 			/* No solution to node i, but it may exist a solution to node j > i. */
 			if (currentSolution == null) continue;
@@ -45,11 +44,13 @@ public class EDF extends BNT {
 			updateAgentStatus(currentSolution);
 			completedTasks.addAll(currentSolution.tasks);
 
+			singletonScores.put(currentSolution.tasks.iterator().next().id, currentSolution.getScore(false));
+
 			for (CoalitionAllocation ca : currentSolution.coalitionAllocations)
 				l.add(ca);
 		}
 
-		solution = new Solution(completedTasks, l.toArray(new CoalitionAllocation[l.size()]), -1, -1);
+		solution = new Solution(completedTasks, l.toArray(new CoalitionAllocation[0]));
 	}
 
 }

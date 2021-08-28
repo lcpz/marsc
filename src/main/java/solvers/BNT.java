@@ -1,19 +1,12 @@
 package solvers;
 
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
 
 import locations.Location;
-import model.Agent;
-import model.CoalitionAllocation;
-import model.MARSC;
-import model.Solution;
-import model.Task;
+import model.*;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.math3.stat.descriptive.rank.Median;
+import toolkit.Utils;
 
 /**
  * Bounded Node Traversal (BNT) algorithm.
@@ -22,13 +15,15 @@ import model.Task;
  */
 public class BNT extends Solver {
 
-	protected Set<Task> taskSet;
+	protected float[] optimalSingletonScores;
+	protected Map<Integer, Float> singletonScores;
 
 	public BNT(MARSC problem) {
 		super(problem);
+		singletonScores = new HashMap<>();
 	}
 
-	protected Solution getSingletonSolution(Task task, Location location, TreeMap<Integer, Set<Agent>> assignablesMap) {
+	protected Solution getSingletonSolution(Task task, Location location, Set<Agent> assignableAgents) {
 		/*
 		 * We assume that task has no uncompleted precedence, and that assignableAgents
 		 * satisfies the spatial constraints. Since we are only defining a solution to
@@ -47,46 +42,41 @@ public class BNT extends Solver {
 		 */
 
 		List<CoalitionAllocation> l = new LinkedList<>();
-		float workloadDone = 0;
-		Integer[] arrivalTimes = assignablesMap.keySet().toArray(new Integer[assignablesMap.size()]);
-		int j;
-		Set<Agent> subCoalition;
-		Agent[] subCoalitionArr;
+		Agent[] coalition = assignableAgents.toArray(new Agent[0]);
+		Agent[] subCoalition;
+		float workloadDone = 0, score = 0, subCoalitionValue, contribution;
+		int endTime, startTime;
 
-		for (int i = 0; i < arrivalTimes.length; i++) { // already sorted
-			subCoalition = assignablesMap.get(arrivalTimes[i]);
-			for (j = i - 1; j >= 0; j--)
-				subCoalition.addAll(assignablesMap.get(arrivalTimes[j]));
-			subCoalitionArr = subCoalition.toArray(new Agent[subCoalition.size()]);
-			float subCoalitionValue = problem.getValue(task, location, subCoalitionArr);
-			float contribution;
-			if (i + 1 < arrivalTimes.length)
-				contribution = (arrivalTimes[i + 1] - arrivalTimes[i]) * subCoalitionValue;
+		for (int i = 0; i < coalition.length; i++) { // already sorted
+			subCoalition = ArrayUtils.subarray(coalition, 0, i + 1);
+			subCoalitionValue = problem.getValue(task, location, subCoalition);
+
+			if (i + 1 <  coalition.length)
+				contribution = (coalition[i + 1].arrivalTime - coalition[i].arrivalTime) * subCoalitionValue;
 			else
-				contribution = (hardLatestTime - arrivalTimes[i]) * subCoalitionValue;
+				contribution = (hardLatestTime - coalition[i].arrivalTime) * subCoalitionValue;
 			workloadDone += contribution;
-			int endTime = arrivalTimes[i]
-					+ (int) Math.ceil((workload - (workloadDone - contribution)) / subCoalitionValue);
-			int startTime = arrivalTimes[i];
-			if (startTime <= earliestTime)
+			endTime = (int) Math.ceil(coalition[i].arrivalTime + ((workload - (workloadDone - contribution)) / subCoalitionValue)) - 1;
+			startTime = coalition[i].arrivalTime;
+			if (startTime < earliestTime)
 				startTime = earliestTime;
-			else
-				startTime++;
+			if (endTime < startTime)
+				endTime = startTime;
 			if (workloadDone < workload) {
-				if (i + 1 < arrivalTimes.length)
-					l.add(new CoalitionAllocation(task, location, subCoalitionArr, subCoalitionValue, startTime,
-							arrivalTimes[i + 1]));
-				else
-					l.add(new CoalitionAllocation(task, location, subCoalitionArr, subCoalitionValue, startTime,
-							endTime));
-			} else { // minimal set of coalition allocations, stop
-				if (endTime < startTime)
-					endTime = startTime;
+				if (i + 1 < coalition.length) {
+					l.add(new CoalitionAllocation(task, location, subCoalition, subCoalitionValue, startTime, coalition[i + 1].arrivalTime));
+					score += getMarginalScore(task, startTime, coalition[i + 1].arrivalTime);
+				}
+			} else {
+				l.add(new CoalitionAllocation(task, location, subCoalition, subCoalitionValue, startTime, endTime));
+				score += getMarginalScore(task, startTime, endTime);
 
-				l.add(new CoalitionAllocation(task, location, subCoalitionArr, subCoalitionValue, startTime, endTime));
-
-				if (endTime <= hardLatestTime)
-					return new Solution(Set.of(task), l.toArray(new CoalitionAllocation[l.size()]), -1, -1);
+				if (endTime <= hardLatestTime) {
+					Solution newSolution = new Solution(Set.of(task), l.toArray(new CoalitionAllocation[0]), score);
+					newSolution.taskCompletionTime = new HashMap<>();
+					newSolution.taskCompletionTime.put(task, endTime);
+					return newSolution;
+				}
 
 				break;
 			}
@@ -95,53 +85,37 @@ public class BNT extends Solver {
 		return null;
 	}
 
-	public static Comparator<Integer> intCmp = new Comparator<>() {
-		@Override
-		public int compare(Integer i1, Integer i2) {
-			return i1 - i2;
-		}
-	};
+	public static Comparator<Agent> byArrivalTime = Comparator.comparingInt(a -> a.arrivalTime);
 
-	public TreeMap<Integer, Set<Agent>> getAssignables(Task v, Location location) {
-		TreeMap<Integer, Set<Agent>> assignablesMap = new TreeMap<>(intCmp);
-
+	public TreeSet<Agent> getAssignable(Task v, Location location, Agent[] agents) {
 		int earliestTime = v.demand.timeWindow.earliestTime;
 		int hardLatestTime = v.demand.timeWindow.hardLatestTime;
 		int arrivalTime;
 
-		Set<Agent> s;
+		TreeSet<Agent> assignableAgents = new TreeSet<>(byArrivalTime);
+
 		for (Agent a : agents) {
 			arrivalTime = a.endTime + a.getTravelTimeTo(location);
-			if (arrivalTime < hardLatestTime) {
-				if (arrivalTime < earliestTime)
-					a.arrivalTime = earliestTime;
-				else
-					a.arrivalTime = arrivalTime;
-				s = assignablesMap.get(a.arrivalTime);
-				if (s == null)
-					s = new HashSet<>();
-				s.add(a); // a satisfies the spatial constraints of (v, location)
-				assignablesMap.put(a.arrivalTime, s);
+			if (arrivalTime <= hardLatestTime) { // a satisfies the spatial constraints of (v, location)
+				a.arrivalTime = Math.max(arrivalTime, earliestTime);
+				assignableAgents.add(a);
 			}
 		}
 
-		return assignablesMap;
+		return assignableAgents;
 	}
 
-	protected Solution getSingletonSolution(Task v) {
+	protected Solution getSingletonSolution(Task v, Agent[] agents) {
 		Solution currentSolution, bestSolution = null;
-		TreeMap<Integer, Set<Agent>> assignablesMap;
+		TreeSet<Agent> assignableAgents;
 
 		for (Location location : v.demand.possibleLocations) {
-			assignablesMap = getAssignables(v, location);
+			assignableAgents = getAssignable(v, location, agents);
 
-			if (assignablesMap != null && assignablesMap.size() > 0) { // satisfy the temporal constraints
-				currentSolution = getSingletonSolution(v, location, assignablesMap);
+			if (assignableAgents != null && assignableAgents.size() > 0) { // satisfy the temporal constraints
+				currentSolution = getSingletonSolution(v, location, assignableAgents);
 				if (currentSolution != null)
-					/* Maximise the objective function by picking a
-					 * singleton solution that completes its task
-					 * in the shortest amount of time. */
-					if (bestSolution == null || currentSolution.getLastWorkingTime() < bestSolution.getLastWorkingTime())
+					if (bestSolution == null || currentSolution.getScore(true) > bestSolution.getScore(true))
 						bestSolution = currentSolution;
 			}
 		}
@@ -150,38 +124,20 @@ public class BNT extends Solver {
 	}
 
 	protected void updateAgentStatus(Solution solution) {
-		CoalitionAllocation lastCA = solution.coalitionAllocations[solution.coalitionAllocations.length - 1];
-		for (Agent a : lastCA.coalition) {
-			a.endTime = lastCA.endTime;
-			a.location = lastCA.location;
+	    if (solution != null && solution.coalitionAllocations.length > 0) {
+			CoalitionAllocation lastCA = solution.coalitionAllocations[solution.coalitionAllocations.length - 1];
+			for (Agent a : lastCA.coalition) {
+				a.endTime = lastCA.endTime;
+				a.location = lastCA.location;
+			}
 		}
 	}
 
-	public final Comparator<Task> comparator = new Comparator<>() {
-		@Override
-		public int compare(Task v1, Task v2) {
-			if (order != null) { // satisfy ordering constraints
-				Task prec1 = order.get(v1);
-				Task prec2 = order.get(v2);
-				if (prec1 != null && prec1.equals(v2))
-					return 1;
-				if (prec2 != null && prec2.equals(v1))
-					return -1;
-			}
-
-			if (v1.demand.timeWindow.earliestTime != v2.demand.timeWindow.earliestTime)
-				return v1.demand.timeWindow.earliestTime - v2.demand.timeWindow.earliestTime;
-
-			return v1.demand.timeWindow.hardLatestTime - v2.demand.timeWindow.hardLatestTime;
-		}
-	};
-
 	@Override
 	public void solve() {
-		taskSet = new TreeSet<>(comparator);
+		Set<Task> taskSet = new TreeSet<>(comparator);
 
-		for (Task v : problem.getTasks())
-			taskSet.add(v);
+		Collections.addAll(taskSet, problem.getTasks());
 
 		HashSet<Task> completedTasks = new HashSet<>();
 		HashSet<CoalitionAllocation> l = new HashSet<>();
@@ -193,23 +149,65 @@ public class BNT extends Solver {
 				if (v.status.equals(Task.Status.COMPLETED))
 					continue;
 
-				currentSolution = getSingletonSolution(v);
-				if (currentSolution != null && (bestSolution == null || currentSolution.getLastWorkingTime() < bestSolution.getLastWorkingTime()))
+				currentSolution = getSingletonSolution(v, agents);
+				if (currentSolution != null && (bestSolution == null || currentSolution.getScore(false) > bestSolution.getScore(false)))
 					bestSolution = currentSolution;
 			}
 
 			if (bestSolution == null)
 				break; // no singleton solution for j >= i
 
+			singletonScores.put(bestSolution.tasks.iterator().next().id, bestSolution.getScore(false));
 			updateAgentStatus(bestSolution);
 			completedTasks.addAll(bestSolution.tasks);
 			for (Task v : bestSolution.tasks)
 				v.status = Task.Status.COMPLETED;
-			for (CoalitionAllocation ca : bestSolution.coalitionAllocations)
-				l.add(ca);
+			Collections.addAll(l, bestSolution.coalitionAllocations);
 		}
 
-		solution = new Solution(completedTasks, l.toArray(new CoalitionAllocation[l.size()]), -1, -1);
+		solution = new Solution(completedTasks, l.toArray(new CoalitionAllocation[0]));
 	}
 
+	@Override
+	public float getAnytimeQualityIndex() {
+		return 0;
+	}
+
+	public float[] getOptimalSingletonScores() {
+		if (optimalSingletonScores == null) {
+			optimalSingletonScores = new float[tasks.length];
+
+			 // For each task v, compute the optimal score of the sub-problem where there is only v
+			Agent[] agentsCopy = Utils.deepClone(agents);
+			Solution s;
+			for (int i = 0; i < tasks.length; i++) {
+				s = getSingletonSolution(tasks[i], agentsCopy);
+				if (s != null)
+					optimalSingletonScores[i] = s.getScore(false);
+				for (Agent a : agentsCopy)
+					a.arrivalTime = 0;
+			}
+		}
+
+		return optimalSingletonScores;
+	}
+
+	public Double getMedianApproximationScoreRatio(float[] optimalSingletonScores) {
+		double[] r = new double[tasks.length];
+		Float singletonScore;
+
+		for (int i = 0; i < tasks.length; i++) {
+		    singletonScore = singletonScores.get(i);
+			if (singletonScore != null && Math.abs(optimalSingletonScores[i]) > 0)
+				r[i] = Math.abs(singletonScore / optimalSingletonScores[i]);
+		}
+
+		//ArrayUtils.removeAllOccurrences(r, 0);
+
+		return new Median().evaluate(r);
+	}
+
+	public Double getMedianApproximationScoreRatio() {
+		return getMedianApproximationScoreRatio(getOptimalSingletonScores());
+	}
 }

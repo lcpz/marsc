@@ -28,7 +28,7 @@ public class NormalProblem extends MARSC {
 		coalitionValues = new float[agents.length];
 
 		for (int i = 0; i < agents.length; i++) {
-			coalitionValues[i] = (float) Math.abs(new NormalDistribution(10 * (i+1), 0.1).sample());
+			coalitionValues[i] = (float) new NormalDistribution(10 * (i+1), 0.1).sample();
 			if (modified && ThreadLocalRandom.current().nextInt(5) == 0) // modified and probability 0.2
 				coalitionValues[i] += (float) Math.abs(unif.sample());
 		}

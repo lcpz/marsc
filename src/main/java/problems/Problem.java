@@ -28,11 +28,21 @@ public class Problem {
 		case "MODIFIED_NORMAL":
 			return new NormalProblem(tasks, order, agents, true);
 		case "AGENT_BASED":
-			return new AgentBasedProblem(tasks, order, agents);
+			return new AgentBasedProblem(tasks, order, agents, false, false);
+		case "U_AGENT_BASED":
+			return new AgentBasedProblem(tasks, order, agents, true, false);
+		case "C_AGENT_BASED":
+			return new AgentBasedProblem(tasks, order, agents, false, true);
+		case "UC_AGENT_BASED":
+			return new AgentBasedProblem(tasks, order, agents, true, true);
 		case "NDCS":
-			return new CongestedNDCSProblem(tasks, order, agents, false);
-		case "CONGESTED_NDCS":
-			return new CongestedNDCSProblem(tasks, order, agents, true);
+			return new NDCSProblem(tasks, order, agents, false, false);
+		case "U_NDCS":
+			return new NDCSProblem(tasks, order, agents, true, false);
+		case "C_NDCS":
+			return new NDCSProblem(tasks, order, agents, false, true);
+		case "UC_NDCS":
+			return new NDCSProblem(tasks, order, agents, true, true);
 		default:
 			return null;
 		}

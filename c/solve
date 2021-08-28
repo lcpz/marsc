@@ -1,0 +1,4 @@
+#!/bin/sh
+# dependency: time (not your shell built-in command)
+
+/usr/bin/time -v ./xmip $1 l

@@ -1,8 +1,8 @@
 package toolkit;
 
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
+import java.util.function.IntUnaryOperator;
 
 import com.google.common.collect.Sets;
 import com.google.common.graph.GraphBuilder;
@@ -123,4 +123,33 @@ public class Utils {
 		return null;
 	}
 
+    public static int[] deepClone(int[] a) {
+		//return Arrays.stream(a).map(IntUnaryOperator.identity()).toArray();
+		int[] b = new int[a.length];
+		for (int i = 0; i < a.length; i++)
+			b[i] = a[i];
+		return b;
+    }
+
+	public static Agent[] deepClone(Agent[] a) {
+		//return Arrays.stream(a).map(IntUnaryOperator.identity()).toArray();
+		Agent[] b = new Agent[a.length];
+		for (int i = 0; i < a.length; i++)
+			b[i] = new Agent(a[i].id, a[i].initialLocation, a[i].speed);
+		return b;
+	}
+
+	public static double[] toPrimitiveArray(List<Double> r) {
+		if (r == null)
+			return null;
+
+		double[] arr = new double[r.size()];
+
+		int i = 0;
+		for (Double d : r)
+		    if (d != null)
+				arr[i++] = d;
+
+		return arr;
+	}
 }

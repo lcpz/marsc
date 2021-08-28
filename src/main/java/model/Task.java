@@ -15,11 +15,11 @@ public class Task implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
-	public static enum Status {
+	public enum Status {
 		UNCOMPLETED, // the workload of this task is > 0
-		ALLOCABLE, // at least 1 agent can reach and work on this task before its hard latest time
-		ALLOCATED, // at least 1 agent is reaching or working on it
-		COMPLETED; // the workload of this task is <= 0
+		ALLOCABLE,   // at least 1 agent can reach and work on this task before its hard latest time
+		ALLOCATED,   // at least 1 agent is reaching or working on it
+		COMPLETED    // the workload of this task is <= 0
 	}
 
 	public final int id;
@@ -30,7 +30,10 @@ public class Task implements Serializable {
 	/* Current task status. */
 	public Status status = Status.UNCOMPLETED;
 
-	/* At each possible location, defines which agents this task can be currently assigned to. */
+	/*
+	 * At each possible location, defines which agents this task can be currently assigned to.
+	 * This structure is only used by CTS algorithms.
+	 */
 	public Map<Location, Set<Agent>> allocableMap;
 
 	public Task(int id, Demand demand) {

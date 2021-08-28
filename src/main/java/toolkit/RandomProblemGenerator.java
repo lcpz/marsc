@@ -1,21 +1,16 @@
 package toolkit;
 
+import locations.Location;
+import locations.LocationPoint;
+import model.*;
+import org.apache.commons.math3.distribution.UniformIntegerDistribution;
+import org.apache.commons.math3.distribution.UniformRealDistribution;
+import problems.Problem;
+
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
-
-import org.apache.commons.math3.distribution.UniformIntegerDistribution;
-import org.apache.commons.math3.distribution.UniformRealDistribution;
-
-import locations.Location;
-import locations.LocationPoint;
-import model.Agent;
-import model.Demand;
-import model.MARSC;
-import model.Task;
-import model.TimeWindow;
-import problems.Problem;
 
 /**
  * A generator of random MARSC instances, with Point locations.
@@ -26,7 +21,7 @@ public class RandomProblemGenerator implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
-	public MARSC generate(String type, int agentNr, int taskNr, int taskLocNr, int worldDim) {
+	public static MARSC generate(String type, int agentNr, int taskNr, int taskLocNr, int worldDim) {
 		int i, j;
 		ThreadLocalRandom rnd = ThreadLocalRandom.current();
 
@@ -53,7 +48,7 @@ public class RandomProblemGenerator implements Serializable {
 			int earliestTime = rnd.nextInt(softLatestTime);
 			TimeWindow timeWindow = new TimeWindow(earliestTime, softLatestTime, hardLatestTime);
 
-			float profit = ThreadLocalRandom.current().nextFloat() + 0.1f;
+			float profit = ThreadLocalRandom.current().nextFloat() + 1f;
 
 			Demand demand = new Demand(possibleLocations, workload, profit, timeWindow);
 
@@ -71,8 +66,9 @@ public class RandomProblemGenerator implements Serializable {
 
 		Agent[] agents = new Agent[agentNr];
 		for (i = 0; i < agentNr; i++)
-			// random location position, and all agents have the speed
-			agents[i] = new Agent(i, locations[ThreadLocalRandom.current().nextInt(locations.length)], 1);
+			// random location position
+			agents[i] = new Agent(i, locations[ThreadLocalRandom.current().nextInt(locations.length)],
+			    ThreadLocalRandom.current().nextFloat() + 1f);
 
 		return Problem.getInstance(type, tasks, order, agents);
 	}

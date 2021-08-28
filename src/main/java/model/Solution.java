@@ -1,11 +1,6 @@
 package model;
 
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.commons.math3.stat.descriptive.rank.Median;
 
@@ -20,16 +15,14 @@ public class Solution {
 	 * Sort the coalition allocations of this solution by time, for human
 	 * readability.
 	 */
-	public static final Comparator<CoalitionAllocation> SortByStartTime = new Comparator<>() {
-		public int compare(CoalitionAllocation a, CoalitionAllocation b) {
-			if (a.startTime == b.startTime) {
-				if (a.endTime == b.endTime)
-					return -1; // put A first
-				return a.endTime - b.endTime;
-			}
-
-			return a.startTime - b.startTime;
+	public static final Comparator<CoalitionAllocation> SortByStartTime = (a, b) -> {
+		if (a.startTime == b.startTime) {
+			if (a.endTime == b.endTime)
+				return -1; // put A first
+			return a.endTime - b.endTime;
 		}
+
+		return a.startTime - b.startTime;
 	};
 
 	/* The tasks completed by this solution. */
@@ -44,36 +37,21 @@ public class Solution {
 	/* The completion time of each task. */
 	public Map<Task, Integer> taskCompletionTime;
 
-	/* The maximum time unit at which each agent in the solution is free.
-	 *
-	 * That is, ca.endTime + 1, where ca is the last coalition allocation
-	 * in which agent a appears. */
-	public Map<Agent, CoalitionAllocation> lacaMap;
+	/* Solution score, and median score per task. */
+	private float score = -1, medianSingletonScore = -1;
 
-	/*
-	 * Solution quality: the $\Delta$ score, where 0 means unfeasible and -1 means
-	 * not computed.
-	 */
-	public float degree = -1;
-
-	/*
-	 * Like <code>degree</code>, but it also takes into account how early tasks are
-	 * completed in the solution.
-	 */
-	public float earliness = -1;
-
-	public long score = -1, medianSingletonScore = -1;
-
-	public Solution(Set<Task> tasks, CoalitionAllocation[] coalitionAllocations, float degree, float earliness) {
+	public Solution(Set<Task> tasks, CoalitionAllocation[] coalitionAllocations) {
 		this.tasks = tasks;
 		this.coalitionAllocations = coalitionAllocations;
-		this.degree = degree >= -1 ? degree : -1;
-		this.earliness = earliness >= -1 ? earliness : -1;
 
 		agents = new HashSet<>();
 		for (CoalitionAllocation ca : coalitionAllocations)
-			for (Agent a : ca.coalition)
-				agents.add(a);
+			Collections.addAll(agents, ca.coalition);
+	}
+
+	public Solution(Set<Task> tasks, CoalitionAllocation[] coalitionAllocations, float score) {
+		this(tasks, coalitionAllocations);
+		this.score = score;
 	}
 
 	/**
@@ -102,6 +80,7 @@ public class Solution {
 		return tasks.equals(solution.tasks);
 	}
 
+	@SuppressWarnings("unused")
 	public boolean equals(Solution solution) {
 		if (shallowEquals(solution))
 			return Arrays.equals(coalitionAllocations, solution.coalitionAllocations);
@@ -111,9 +90,9 @@ public class Solution {
 	@Override
 	public String toString() {
 		StringBuilder s = new StringBuilder(
-				String.format("Solution [tasks = %d, degree = %s, earliness = %s]\n", tasks.size(), degree, earliness));
+			String.format("Solution [tasks = %d, score = %s, median singleton score = %s]\n", tasks.size(), score, medianSingletonScore));
 		for (CoalitionAllocation ca : coalitionAllocations)
-			s.append(ca + "\n");
+			s.append(ca).append("\n");
 		return s.toString();
 	}
 
@@ -128,38 +107,47 @@ public class Solution {
 	 *
 	 * @return A long integer.
 	 */
-	public long getScore() {
-		if (score == -1) {
+	public float getScore(boolean compute) {
+		if (compute) {
 			HashMap<Integer, Double> m = new HashMap<>();
 			for (Task v : tasks)
-				m.put(v.id, Double.valueOf(0d));
+				m.put(v.id, 0d);
 
 			score = 0;
-			int i;
+			float marginalScore, profit;
+			int i, beta, gamma;
 			for (CoalitionAllocation ca : coalitionAllocations)
 				for (i = ca.startTime; i <= ca.endTime; i++)
 					if (i <= ca.task.demand.timeWindow.softLatestTime) {
-						score += i * ca.task.demand.profit;
-						m.put(ca.task.id, m.get(ca.task.id) + i * ca.task.demand.profit);
-					} else {
 						score += ca.task.demand.profit;
 						m.put(ca.task.id, m.get(ca.task.id) + ca.task.demand.profit);
+					} else {
+						beta = ca.task.demand.timeWindow.softLatestTime;
+						gamma = ca.task.demand.timeWindow.hardLatestTime;
+						profit = ca.task.demand.profit;
+						marginalScore = (float) (1 - ((i - beta)/(gamma - beta + 1))) * profit;
+						score += marginalScore;
+						m.put(ca.task.id, m.get(ca.task.id) + marginalScore);
 					}
 
 			i = 0;
 			double[] singletonScores = new double[tasks.size()];
 			for (Double d : m.values())
-				singletonScores[i++] = d.doubleValue();
+				singletonScores[i++] = d;
 
-			medianSingletonScore = (long) new Median().evaluate(singletonScores);
+			medianSingletonScore = (float) new Median().evaluate(singletonScores);
 		}
 
 		return score;
 	}
 
-	public long getMedianSingletonScore() {
+	public float getScore() {
+		return getScore(true);
+	}
+
+	public float getMedianSingletonScore() {
 		if (medianSingletonScore == -1)
-			getScore();
+			getScore(true);
 
 		return medianSingletonScore;
 	}
