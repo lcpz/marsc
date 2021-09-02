@@ -12,7 +12,7 @@ import java.util.concurrent.Executors;
 
 public class ANT extends BNT {
 
-    protected long timeoutMs, maxPermutations;
+    protected long timeoutMs, maxPermutations, maxConsecutiveInvestigatedLimit;
 
     protected boolean verbose;
 
@@ -20,7 +20,7 @@ public class ANT extends BNT {
     protected boolean stoppingCondition;
     protected long skipped; // number of permutations that have been safely skipped so far
     protected long investigated; // number of permutations that have been investigated
-    protected long consecutiveInvestigated;
+    protected long maxConsecutiveInvestigated; // number of consecutive permutations investigated (i.e., without improving the incumbent solution)
     protected long[] permutationsLeft;
 
     protected boolean timeout; // solving time limit condition
@@ -39,10 +39,11 @@ public class ANT extends BNT {
         anytimeSolutionScores.add(0f);
     }
 
-    public ANT(MARSC problem, long timeoutMs, long maxPermutations, boolean verbose) {
+    public ANT(MARSC problem, long timeoutMs, long maxPermutations, long maxConsecutiveInvestigatedLimit, boolean verbose) {
         this(problem);
         this.timeoutMs = timeoutMs;
         this.maxPermutations = maxPermutations;
+        this.maxConsecutiveInvestigatedLimit = maxConsecutiveInvestigatedLimit;
         this.verbose = verbose;
     }
 
@@ -97,9 +98,9 @@ public class ANT extends BNT {
      * for any permutation of l > k tasks, hence stop.
      */
     private synchronized void updateStoppingCondition(int k) {
-        if (this.solution != null && this.solution.tasks.size() - 1 <= k) {
+        if (k >= 0 && this.solution != null && this.solution.tasks.size() > 0 && this.solution.tasks.size() - 1 <= k) {
             if (permutationsLeft[k] == -1) // lazy initialisation
-                permutationsLeft[k] = CombinatoricsUtils.binomialCoefficient(tasks.length, k);
+                permutationsLeft[k] = CombinatoricsUtils.binomialCoefficient(tasks.length, k + 1);
             stoppingCondition = --permutationsLeft[k] - skipped <= 0;
         }
     }
@@ -122,7 +123,7 @@ public class ANT extends BNT {
                                 .replace(",", ".").replace("~", ","));
                 }
 
-                consecutiveInvestigated = 0;
+                maxConsecutiveInvestigated = 0;
             }
         }
 
@@ -136,7 +137,7 @@ public class ANT extends BNT {
         skipped = 0; // number of permutations that have been safely skipped
         permutationsLeft = new long[tasks.length];
 
-        consecutiveInvestigated = 0;
+        maxConsecutiveInvestigated = 0;
         int i, j;
         int[] c = new int[tasks.length], a = new int[tasks.length];
 
@@ -176,11 +177,12 @@ public class ANT extends BNT {
                     });
                     investigated++;
 
-                    // convergence criterion: stop if the incumbent solution does not improve after 1 million permutations
-                    stoppingCondition = ++consecutiveInvestigated >= 10e5;
+                    // convergence criterion: stop if the incumbent solution does not improve after X permutations
+                    if (maxPermutations <= 0 && maxConsecutiveInvestigatedLimit > 0)
+                        stoppingCondition = ++maxConsecutiveInvestigated >= maxConsecutiveInvestigatedLimit;
                 } else {
                     skipped++;
-                    consecutiveInvestigated = 0;
+                    maxConsecutiveInvestigated = 0;
                 }
 
                 c[i]++;

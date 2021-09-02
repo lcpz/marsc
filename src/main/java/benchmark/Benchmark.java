@@ -48,7 +48,7 @@ public class Benchmark {
 		for (String algorithm : algorithms)
 			switch (algorithm) {
 				case "ANT": // Anytime and exact Node Traversal
-					getAndPrintResults(new ANT(problem.clone(), timeoutMs, maxPermutations, verbose), i++, batchIdx);
+					getAndPrintResults(new ANT(problem.clone(), timeoutMs, maxPermutations, maxConsecutiveInvestigated, verbose), i++, batchIdx);
 					break;
 				case "BNT": // Bounded Node Traversal
 					getAndPrintResults(new BNT(problem.clone()), i++, batchIdx);
@@ -312,6 +312,9 @@ public class Benchmark {
 
 	@Parameter(names = { "--max-permutations", "-q" }, description = "ANT's maximum number of permutations investigated. Set 0 to disable it")
 	private long maxPermutations = 100000; // 100k
+
+	@Parameter(names = { "--max-consecutive-permutations", "-c" }, description = "ANT's maximum number of consecutive permutations investigated without improving the incumbent solution (i.e., convergence criterion). Set 0 to disable it")
+	private long maxConsecutiveInvestigated = 1000000; // 1 million
 
 	@Parameter(names = { "--verbose", "-y" }, description = "Be verbose (only used by ANT and CPLEX)")
 	private boolean verbose = false;
