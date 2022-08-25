@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.commons.math3.distribution.UniformIntegerDistribution;
-import org.apache.commons.math3.distribution.UniformRealDistribution;
 
 import locations.Location;
 import locations.LocationLatLng;
@@ -37,6 +36,8 @@ public class Setup {
 
 	public final Map<String, ArrayList<String>> stationsMap;
 
+	public final Map<String, Integer> nodeLabel;
+
 	protected int currIdx; // current record index
 
 	private ThreadLocalRandom rnd = ThreadLocalRandom.current();
@@ -48,6 +49,12 @@ public class Setup {
 		String label = String.format("[%s]", this.getClass().getSimpleName());
 		System.out.print(String.format("%s extracting task records... ", label));
 		nodeRecords = extract(taskDatasetPath);
+
+		// label -> row_index map to avoid hard-coding
+		nodeLabel = new HashMap<>();
+		for (int i = 0; i < nodeRecords[0].length; i++)
+			nodeLabel.put(nodeRecords[0][i], i);
+
 		//currIdx = ThreadLocalRandom.current().nextInt(1, nodeRecords.length); // random initial record
 		currIdx = 1;
 		System.out.print(String.format("done.\n%s extracting station records... ", label));
@@ -154,22 +161,33 @@ public class Setup {
 		TimeWindow timeWindow, twPrev, tw;
 		int workload;
 
+		int latIdx = nodeLabel.get("Latitude");
+		int lngIdx = nodeLabel.get("Longitude");
+		int stationIdx = nodeLabel.get("DeployedFromStation_Name");
+		int stationCodeIdx = nodeLabel.get("DeployedFromStation_Code");
+		int attendanceTimeIdx = nodeLabel.get("AttendanceTimeSeconds");
+
 		for (i = 0; i < tasks.length; i++) {
 			possibleLocations = new LocationLatLng[] {
-				new LocationLatLng(Double.parseDouble(nodeRecords[currIdx][4]),
-				Double.parseDouble(nodeRecords[currIdx][5])) // 1 location per node
+				new LocationLatLng(Double.parseDouble(nodeRecords[currIdx][latIdx]),
+				Double.parseDouble(nodeRecords[currIdx][lngIdx])) // 1 location per node
 			};
 
-			station = stationsMap.get(nodeRecords[currIdx][9]);
 			location = null;
+
+			station = stationsMap.get(nodeRecords[currIdx][stationIdx]);
 			if (station == null)
-				System.err.println(String.format("Input station dataset does not contain %s", nodeRecords[currIdx][9]));
+				stationsMap.get(nodeRecords[currIdx][stationCodeIdx]);
+
+			if (station == null) // if no corresponding station name or code
+				System.err.println(String.format("Input station dataset does not contain %s (%s), skipping it",
+						nodeRecords[currIdx][stationIdx], nodeRecords[currIdx][stationCodeIdx]));
 			else {
-				location = new LocationLatLng(Double.parseDouble(station.get(1)), Double.parseDouble(station.get(2)));
+				location = new LocationLatLng(Double.parseDouble(station.get(0)), Double.parseDouble(station.get(1)));
 				initialAgentLocations.add(location);
 			}
 
-			attendance = (int) Math.abs(Integer.parseInt(nodeRecords[currIdx][8]));
+			attendance = (int) Math.abs(Integer.parseInt(nodeRecords[currIdx][attendanceTimeIdx]));
 
 			earliestTime = 0;
 			if (location != null)

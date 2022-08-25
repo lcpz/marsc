@@ -80,7 +80,6 @@ public class Solution {
 		return tasks.equals(solution.tasks);
 	}
 
-	@SuppressWarnings("unused")
 	public boolean equals(Solution solution) {
 		if (shallowEquals(solution))
 			return Arrays.equals(coalitionAllocations, solution.coalitionAllocations);

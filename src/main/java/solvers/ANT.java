@@ -2,6 +2,7 @@ package solvers;
 
 import model.*;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.math3.exception.MathArithmeticException;
 import org.apache.commons.math3.util.CombinatoricsUtils;
 import toolkit.Utils;
 
@@ -100,7 +101,12 @@ public class ANT extends BNT {
     private synchronized void updateStoppingCondition(int k) {
         if (k >= 0 && this.solution != null && this.solution.tasks.size() > 0 && this.solution.tasks.size() - 1 <= k) {
             if (permutationsLeft[k] == -1) // lazy initialisation
-                permutationsLeft[k] = CombinatoricsUtils.binomialCoefficient(tasks.length, k + 1);
+            	try {
+            		if (tasks.length > 0 && k + 1 <= tasks.length)
+            			permutationsLeft[k] = CombinatoricsUtils.binomialCoefficient(tasks.length, k + 1);
+            	} catch (MathArithmeticException e) {
+            		// the result is too large to be represented by a long integer, skip assignment
+            	}
             stoppingCondition = --permutationsLeft[k] - skipped <= 0;
         }
     }

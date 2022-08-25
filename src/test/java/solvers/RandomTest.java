@@ -37,8 +37,6 @@ class RandomTest {
 	static float rmax = Float.NEGATIVE_INFINITY;
 	static float ravg = 0;
 
-	static RandomProblemGenerator pg = new RandomProblemGenerator();
-
 	public static float getRatio(Solution solCTS, Solution solANT) {
 		float r = 100; // only second solver found a solution
 
@@ -60,7 +58,7 @@ class RandomTest {
 
 	@RepeatedTest(TEST_REPETITIONS)
 	void test0(RepetitionInfo rep) { // https://stackoverflow.com/a/52074525
-		MARSC problem = pg.generate("SUPERADDITIVE", AGENTS, TASKS, MAX_TASK_LOCATIONS, WORLD_DIM);
+		MARSC problem = RandomProblemGenerator.generate("SUPERADDITIVE", AGENTS, TASKS, MAX_TASK_LOCATIONS, WORLD_DIM);
 
 		if (PRINT_PROBLEM)
 			System.out.print(problem);
